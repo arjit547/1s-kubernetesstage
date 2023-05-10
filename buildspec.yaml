@@ -1,0 +1,33 @@
+
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 12
+    commands:
+      - curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.22.2/2022-01-31/bin/darwin/amd64/aws-iam-authenticator
+      - chmod +x ./aws-iam-authenticator
+      - sudo mv ./aws-iam-authenticator /usr/local/bin/
+      - curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+      - chmod +x ./kubectl
+      - mv ./kubectl /usr/local/bin/kubectl
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 435770184212.dkr.ecr.us-east-1.amazonaws.com
+  build:
+    commands:
+      - docker build -t ms .
+      - docker tag ms:latest 435770184212.dkr.ecr.us-east-1.amazonaws.com/ms:latest
+      - docker push 435770184212.dkr.ecr.us-east-1.amazonaws.com/ms:latest
+  post_build:
+    commands:
+      - aws eks --region us-east-2 update-kubeconfig  --name console-eks-test --role-arn arn:aws:eks:us-east-1:435770184212:cluster/console-eks-test
+      - cat ~/.kube/config
+      - aws sts get-caller-identity
+      - kubectl config view --minify=true
+      - Kubectl delete -f GameApp.yaml
+      - kubectl apply -f GameApp.yaml
+      - printf '[{"name":"GameApp.yaml","imageUri":"435770184212.dkr.ecr.us-east-1.amazonaws.com/ms:latest"}]' 435770184212.dkr.ecr.us-east-1.amazonaws.com/ms:latest > GameApp.yaml
+artifacts:
+  files:
+    - GameApp.yaml
